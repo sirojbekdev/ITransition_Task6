@@ -1,0 +1,35 @@
+﻿@page "/"
+
+@inject NavigationManager Navigation
+@inject IUserService _userService
+
+<PageTitle>Home</PageTitle>
+
+<div class="content card p-2">
+    <div class="input-group flex-nowrap">
+      <span class="input-group-text" id="addon-wrapping">Enter your name</span>
+        <input aria-type="text" class="form-control" placeholder="Username" aria-label="Username" aria-describedby="addon-wrapping" @bind="@Name" @oninput="@((e) => { Name=(string)e.Value;})">
+      <button @onclick="Navigate" class="btn-primary btn">Enter</button>
+    </div>
+    <div class="@ErrorClass alert alert-danger my-2" >
+        * Please Enter your name
+    </div>
+</div>
+
+
+@code{
+    private string Name;
+    private string ErrorClass = "visually-hidden"; 
+
+    void Navigate()
+    {
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            ErrorClass = "display-block";
+        }
+        else
+        {
+            Navigation.NavigateTo($"Dashboard/{Name}");
+        }
+    }
+}

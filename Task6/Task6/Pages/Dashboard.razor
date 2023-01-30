@@ -1,0 +1,126 @@
+﻿@page "/Dashboard/{Name}";
+
+@implements IDisposable
+@inject IUserService _userService 
+@inject IEmailService _emailService 
+
+
+<h3>User: @Name</h3>
+<Divider></Divider>
+<EditForm OnValidSubmit="@SendEmailAsync" OnInvalidSubmit="ShowError" Model="@email">
+    <DataAnnotationsValidator />
+    <label for="Recipient">Recipient</label>
+    <AutoComplete name="Recipient" Id="Recipient" @bind-Value="email.Recipient" Options="@options" OnSelectionChange="OnSelectionChange" OnActiveChange="OnActiveChange" Placeholder="Recepient here" />
+    <ValidationMessage For="@(()=>email.Recipient)" />
+    <Divider></Divider>
+    <label for="Title">Title</label>
+    <Input Id="Title" name="Title" Placeholder="input with clear icon" AllowClear="true" @bind-Value="email.Title" TValue="string" />
+    <ValidationMessage For="@(()=>email.Title)" />
+    <Divider></Divider>
+    <label for="EmailBody">Message</label>
+    <TextArea name="EmailBody" Id="EmailBody" Placeholder="textarea with clear icon" AllowClear="true" @bind-Value="email.EmailBody" />
+    <ValidationMessage For="@(()=>email.EmailBody)" />
+    <Divider></Divider>
+    <button type="submit" class="btn btn-primary">Send</button>
+    <Divider></Divider>
+    @if (displayValidationErrorMessages)
+    {
+        <div class="col-md-4" style="margin-top:10px">
+            <label>Validation Messages: </label>
+            <ValidationSummary />
+        </div>
+    }
+</EditForm>
+@if (displayAddedToDB)
+{
+    <div class="row bg-success text-white" style="margin-top:10px; height:40px">
+        <label class="p-2">Email has been sent </label>
+    </div>
+}
+
+
+<Table DataSource="allEmails">
+      <ColumnDefinitions>
+          <PropertyColumn Property="c=>c.From" />
+          <PropertyColumn Property="c=>c.Title" />
+          <PropertyColumn Property="c=>c.Date" />
+          <PropertyColumn Property="c=>c.EmailBody" Title="Message" />
+      </ColumnDefinitions>
+</Table>
+
+
+@code {
+    [Parameter]
+    public string Name{ get; set; }
+
+    private Timer timer = new(5000);
+    User user;
+
+    List<string> options;
+
+    IEnumerable<Email> allEmails;
+    bool displayValidationErrorMessages = false;
+    bool displayAddedToDB = false;
+
+    private Email email = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        user = await _userService.GetUserByNameAsync(Name);
+        if (user == null)
+        {
+            user = await _userService.CreateUserAsync(Name);
+        }
+        options = await _userService.GetAllUserNamesAsync();
+        allEmails = await _emailService.GetUserEmailsAsync(user.Name);
+        timer.Elapsed += (sender, eventArgs) => OnTimerCallback();
+        timer.Start();
+        await base.OnParametersSetAsync();
+    }
+    private void OnTimerCallback()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await ResetStateAsync();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() => timer.Dispose();
+
+    private AutoCompleteOption selectItem;
+    private AutoCompleteOption activeItem;
+
+    void OnSelectionChange(AutoCompleteOption item)
+    {
+        selectItem = item;
+    }
+
+    void OnActiveChange(AutoCompleteOption item)
+    {
+        activeItem = item;
+    }
+
+    private async Task ResetStateAsync()
+    {
+        allEmails = await _emailService.GetUserEmailsAsync(user.Name);
+        options = await _userService.GetAllUserNamesAsync();
+    }
+
+    async Task SendEmailAsync(EditContext context)
+    {
+        email.From = user.Name;
+        email.Date = DateTime.Now;
+        await _emailService.SendEmailAsync(email);
+        displayValidationErrorMessages = false;
+        displayAddedToDB = true;
+        email = new();
+        await ResetStateAsync();
+    }
+
+    private void ShowError(EditContext context)
+    {
+        displayValidationErrorMessages = true;
+        displayAddedToDB = false;
+    }
+}
